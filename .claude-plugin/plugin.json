@@ -1,0 +1,9 @@
+{
+  "name": "osop",
+  "description": "OSOP session logging, workflow review, and self-optimization for Claude Code. Records what you did as .osop + .osoplog.yaml, reviews third-party skills for risks, and optimizes workflows over time.",
+  "version": "1.0.0",
+  "author": {
+    "name": "OSOP",
+    "url": "https://github.com/Archie0125/osop-openclaw-skill"
+  }
+}
