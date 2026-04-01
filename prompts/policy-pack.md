@@ -75,3 +75,26 @@ Safety and governance policies for AI agents executing OSOP workflows. These pol
 - When generating deployment workflows, suggest adding error edges that trigger rollback steps.
 - Error edges from critical steps should lead to compensating actions (e.g., `kubectl rollout undo`).
 - Document rollback procedures in the workflow `description` or node descriptions.
+
+## Policy 8: Risk Assessment Before Execution
+
+**Rule:** Before executing any workflow — especially one authored by a third party — run `osop.risk_assess` and present findings to the user.
+
+**Enforcement:**
+- Call `osop.risk_assess` before `osop.run` on any workflow not authored by the current user.
+- Display the risk score (0-100) and any HIGH or CRITICAL findings prominently.
+- If risk score exceeds 70, require explicit user acknowledgment before proceeding.
+- Flag workflows that: request broad permissions (`write:*`, `admin:*`), lack approval gates before destructive operations, reference external URLs without allowlisting, or have unbounded cost exposure (agent nodes without budget limits).
+
+**Override:** User may say "accept risk" to bypass. Log the override with the risk score.
+
+## Policy 9: Skill Installation Safety
+
+**Rule:** Before installing any skill packaged as `.osop`, analyze its execution flow for security risks.
+
+**Enforcement:**
+- Parse the skill's `workflow.osop` file to enumerate all tools, permissions, and external endpoints it uses.
+- Compare requested permissions against the user's granted scope.
+- Display a permission diff: what the skill needs vs. what the user has authorized.
+- Flag skills with `risk_level: critical` nodes or those accessing sensitive resources (secrets, databases, infrastructure).
+- Recommend users review the skill's execution graph in the OSOP visual editor before installation.
