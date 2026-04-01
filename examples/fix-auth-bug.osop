@@ -1,0 +1,102 @@
+osop_version: "1.0"
+id: session-fix-auth-bug
+name: "Fix Authentication Token Refresh Bug"
+description: "Investigated and fixed a race condition in the token refresh flow that caused intermittent auth failures."
+version: "1.0.0"
+tags: [claude-code, bugfix, auth]
+
+nodes:
+  - id: understand
+    type: human
+    subtype: input
+    name: "User Describes Bug"
+    description: "User reports auth token refresh failing intermittently under load."
+
+  - id: coordinator
+    type: agent
+    subtype: coordinator
+    name: "Plan Investigation"
+    description: "Decide which files to explore and what to look for."
+    spawn_policy:
+      max_children: 3
+
+  - id: explore_auth
+    type: agent
+    subtype: explore
+    name: "Explore Auth Module"
+    parent: coordinator
+    description: "Search auth-related files for token refresh logic."
+
+  - id: explore_tests
+    type: agent
+    subtype: explore
+    name: "Explore Test Coverage"
+    parent: coordinator
+    description: "Check existing tests for the token refresh flow."
+
+  - id: analyze
+    type: agent
+    subtype: llm
+    name: "Analyze Root Cause"
+    description: "Identified race condition: concurrent refresh requests both see expired token."
+    security:
+      risk_level: low
+
+  - id: write_fix
+    type: mcp
+    subtype: tool
+    name: "Write Fix"
+    description: "Added mutex lock to prevent concurrent refresh calls."
+    security:
+      risk_level: medium
+
+  - id: run_tests
+    type: cicd
+    subtype: test
+    name: "Run Tests"
+    description: "Execute test suite to verify fix."
+    security:
+      risk_level: low
+
+  - id: review
+    type: human
+    subtype: review
+    name: "User Reviews Changes"
+
+edges:
+  - from: understand
+    to: coordinator
+    mode: sequential
+
+  - from: coordinator
+    to: explore_auth
+    mode: spawn
+
+  - from: coordinator
+    to: explore_tests
+    mode: spawn
+
+  - from: explore_auth
+    to: analyze
+    mode: sequential
+
+  - from: explore_tests
+    to: analyze
+    mode: sequential
+
+  - from: analyze
+    to: write_fix
+    mode: sequential
+
+  - from: write_fix
+    to: run_tests
+    mode: sequential
+
+  - from: run_tests
+    to: review
+    mode: sequential
+
+  - from: run_tests
+    to: write_fix
+    mode: fallback
+    label: "Tests failed, fix again"

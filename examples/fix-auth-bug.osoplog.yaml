@@ -1,0 +1,173 @@
+osoplog_version: "1.0"
+run_id: "a1b2c3d4-5678-9012-abcd-ef0123456789"
+workflow_id: session-fix-auth-bug
+workflow_version: "1.0.0"
+mode: live
+status: COMPLETED
+
+trigger:
+  type: manual
+  actor: user
+  timestamp: "2026-04-01T10:00:00Z"
+
+started_at: "2026-04-01T10:00:00Z"
+ended_at: "2026-04-01T10:15:30Z"
+duration_ms: 930000
+
+runtime:
+  agent: claude-code
+  model: claude-opus-4-6
+
+node_records:
+  - node_id: understand
+    node_type: human
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:00:00Z"
+    ended_at: "2026-04-01T10:00:30Z"
+    duration_ms: 30000
+    outputs:
+      description: "Auth token refresh fails intermittently under concurrent requests"
+    human_metadata:
+      actor: user
+      decision: approved
+
+  - node_id: coordinator
+    node_type: agent
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:00:30Z"
+    ended_at: "2026-04-01T10:01:00Z"
+    duration_ms: 30000
+    outputs:
+      plan: "Spawn 2 explore agents: one for auth code, one for tests"
+    reasoning:
+      question: "How to investigate the auth bug?"
+      alternatives:
+        - id: single_search
+          description: "Search linearly through all files"
+        - id: parallel_explore
+          description: "Spawn parallel agents for auth code and tests"
+      selected: parallel_explore
+      confidence: 0.9
+
+  - node_id: explore_auth
+    node_type: agent
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:01:00Z"
+    ended_at: "2026-04-01T10:03:00Z"
+    duration_ms: 120000
+    parent_id: coordinator
+    spawn_index: 1
+    isolation: none
+    outputs:
+      files_found: ["src/auth/token-refresh.ts", "src/auth/middleware.ts"]
+      finding: "No mutex or lock around the refresh call"
+    tools_used:
+      - tool: Grep
+        calls: 5
+        details:
+          - { pattern: "refreshToken", files_matched: 3 }
+          - { pattern: "async.*refresh", files_matched: 2 }
+      - tool: Read
+        calls: 4
+        details:
+          - { file: "src/auth/token-refresh.ts", lines: "1-85" }
+          - { file: "src/auth/middleware.ts", lines: "20-60" }
+
+  - node_id: explore_tests
+    node_type: agent
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:01:00Z"
+    ended_at: "2026-04-01T10:02:30Z"
+    duration_ms: 90000
+    parent_id: coordinator
+    spawn_index: 2
+    isolation: none
+    outputs:
+      test_files: ["tests/auth.test.ts"]
+      finding: "No concurrent refresh test exists"
+    tools_used:
+      - tool: Glob
+        calls: 2
+      - tool: Read
+        calls: 3
+
+  - node_id: analyze
+    node_type: agent
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:03:00Z"
+    ended_at: "2026-04-01T10:05:00Z"
+    duration_ms: 120000
+    outputs:
+      root_cause: "Race condition: two concurrent requests both see expired token, both call refresh, second one fails because first already invalidated the old refresh token"
+      fix_approach: "Add mutex lock around refresh call"
+    reasoning:
+      question: "What causes the intermittent failure?"
+      alternatives:
+        - id: mutex
+          description: "Add mutex lock to serialize refresh calls"
+        - id: dedup
+          description: "Deduplicate concurrent refresh into single promise"
+        - id: retry
+          description: "Just add retry logic"
+      selected: mutex
+      confidence: 0.92
+    ai_metadata:
+      model: claude-opus-4-6
+      prompt_tokens: 1250
+      completion_tokens: 340
+
+  - node_id: write_fix
+    node_type: mcp
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:05:00Z"
+    ended_at: "2026-04-01T10:08:00Z"
+    duration_ms: 180000
+    outputs:
+      files_modified: ["src/auth/token-refresh.ts"]
+      lines_changed: 12
+    tools_used:
+      - tool: Edit
+        calls: 2
+        details:
+          - { file: "src/auth/token-refresh.ts", description: "Added mutex import and lock around refresh" }
+      - tool: Write
+        calls: 1
+        details:
+          - { file: "tests/auth-concurrent.test.ts", description: "Added concurrent refresh test" }
+
+  - node_id: run_tests
+    node_type: cicd
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:08:00Z"
+    ended_at: "2026-04-01T10:12:00Z"
+    duration_ms: 240000
+    outputs:
+      total: 42
+      passed: 42
+      failed: 0
+    tools_used:
+      - tool: Bash
+        calls: 1
+        details:
+          - { command: "npm test", exit_code: 0 }
+
+  - node_id: review
+    node_type: human
+    attempt: 1
+    status: COMPLETED
+    started_at: "2026-04-01T10:12:00Z"
+    ended_at: "2026-04-01T10:15:30Z"
+    duration_ms: 210000
+    human_metadata:
+      actor: user
+      decision: approved
+      notes: "Clean fix, good test coverage"
+
+result_summary: "Fixed auth token refresh race condition by adding mutex lock. All 42 tests pass including new concurrent refresh test."
