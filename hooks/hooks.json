@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "If this session had 3 or more distinct steps (file edits, commands, investigations), generate OSOP session logs. Create sessions/YYYY-MM-DD-<short-desc>.osop with workflow definition and sessions/YYYY-MM-DD-<short-desc>.osoplog.yaml with execution record. Follow the format from /osop-log skill. Skip silently if the session was trivial (simple questions, single-file reads, one-liners)."
+          }
+        ]
+      }
+    ]
+  }
+}
